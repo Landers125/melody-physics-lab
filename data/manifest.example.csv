@@ -1,0 +1,3 @@
+track_id,audio_path,midi_path,artist,title
+t001,audio/t001.wav,midi/t001.mid,Example Artist,Example Track One
+t002,audio/t002.wav,,Another Artist,Example Track Two
