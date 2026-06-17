@@ -1,0 +1,17 @@
+# Данные (не коммитим аудио и stems)
+data/
+*.wav
+*.mp3
+*.flac
+*.mid
+*.midi
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# OS
+.DS_Store

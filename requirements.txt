@@ -1,0 +1,23 @@
+# Сепарация
+demucs>=4.0.0
+
+# Транскрипция в MIDI
+basic-pitch>=0.3.0
+
+# Работа с MIDI и анализ мелодии
+pretty_midi>=0.2.10
+music21>=9.1.0
+mido>=1.3.0
+
+# Аудио
+librosa>=0.10.0
+soundfile>=0.12.0
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Анализ данных
+pandas>=2.0.0
+matplotlib>=3.7.0
+
+# Ноутбуки
+jupyter>=1.0.0
