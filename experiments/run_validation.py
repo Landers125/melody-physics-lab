@@ -3,9 +3,14 @@
 Сравнивает предсказанные пики с размеченными моментами озноба и считает
 precision / recall / F1 по каждому треку и по корпусу в целом.
 
+Параметры детектора (joint-гейт, edge-mask, prominence) валидированы на
+синтетике (experiments/synth_smoke_test.py). На реальном аудио оптимум может
+отличаться — подбирайте флагами ниже.
+
 Запуск:
     python experiments/run_validation.py data/manifest.csv data/labels.csv \
-        [--tolerance 2.0] [--min-prominence 1.0] [--out results.csv]
+        [--tolerance 2.0] [--min-prominence 1.0] [--edge-mask 1.0] \
+        [--joint-floor 0.5] [--no-joint] [--out results.csv]
 """
 from __future__ import annotations
 
@@ -27,6 +32,12 @@ def main() -> None:
                     help="допуск совпадения по времени, сек")
     ap.add_argument("--min-prominence", type=float, default=1.0,
                     help="порог пика композитной кривой")
+    ap.add_argument("--edge-mask", type=float, default=1.0,
+                    help="игнорировать пики в пределах N сек от краёв")
+    ap.add_argument("--joint-floor", type=float, default=0.5,
+                    help="нижний вес фреймов без совместного роста громкости+яркости")
+    ap.add_argument("--no-joint", action="store_true",
+                    help="отключить joint-гейт (только композитная кривая)")
     ap.add_argument("--out", default=None, help="CSV с потрековыми метриками")
     args = ap.parse_args()
 
@@ -41,8 +52,10 @@ def main() -> None:
             print(f"[skip] {tr.track_id}: нет разметки")
             continue
         adf = audio_features.extract_audio_features(tr.audio_path)
-        score = detect.frisson_likelihood(adf)
-        peaks = [t for t, _ in detect.find_peaks(score, min_prominence=args.min_prominence)]
+        score = detect.frisson_likelihood(
+            adf, require_joint=not args.no_joint, joint_floor=args.joint_floor)
+        peaks = [t for t, _ in detect.find_peaks(
+            score, min_prominence=args.min_prominence, edge_mask_s=args.edge_mask)]
         res = evaluation.match_peaks_to_labels(peaks, gt, tolerance_s=args.tolerance)
         results.append(res)
         row = {"track_id": tr.track_id, "n_pred": len(peaks), "n_label": len(gt), **res.as_dict()}
