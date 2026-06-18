@@ -26,6 +26,19 @@ def _zscore(x):
     return (x - mu) / (sd + 1e-9)
 
 
+def _nms(peaks, value_idx=2, min_gap_s=2.0):
+    """Non-maximum suppression: collapse peaks within min_gap_s, keep strongest."""
+    if not peaks:
+        return []
+    order = sorted(range(len(peaks)), key=lambda i: peaks[i][value_idx], reverse=True)
+    kept = []
+    for i in order:
+        t = peaks[i][0]
+        if all(abs(t - peaks[j][0]) >= min_gap_s for j in kept):
+            kept.append(i)
+    return [peaks[i] for i in sorted(kept)]
+
+
 def melody_with_times(notes, onset_eps=0.05):
     by = {}
     for s, e, p, v in notes:
@@ -53,7 +66,7 @@ def h2_peaks(notes, order=2, alpha=0.1, min_z=1.5):
     return out, pitches
 
 
-def h3_peaks(notes, win_s=1.0, hop_s=0.5, min_z=1.0):
+def h3_peaks(notes, win_s=1.0, hop_s=0.5, min_z=1.0, min_comp=1.0):
     df = mf.windowed_features(notes, win_s=win_s, hop_s=hop_s)
     rt = df["register_top"].to_numpy(dtype=float)
     poly = df["onset_polyphony"].to_numpy(dtype=float)
@@ -65,7 +78,7 @@ def h3_peaks(notes, win_s=1.0, hop_s=0.5, min_z=1.0):
             continue
         left = comp[k - 1] if k > 0 else -np.inf
         right = comp[k + 1] if k < len(comp) - 1 else -np.inf
-        if comp[k] >= min_z and comp[k] >= left and comp[k] >= right:
+        if comp[k] >= max(min_z, min_comp) and comp[k] >= left and comp[k] >= right:
             out.append((float(tt[k]), float(rt[k]), float(comp[k])))
     return out
 
@@ -80,6 +93,8 @@ def main():
     ap.add_argument("--hop", type=float, default=0.5)
     ap.add_argument("--labels", default=None)
     ap.add_argument("--tolerance", type=float, default=2.0)
+    ap.add_argument("--min-gap", type=float, default=2.0)
+    ap.add_argument("--h3-min", type=float, default=1.0)
     args = ap.parse_args()
 
     notes = midi_io.read_notes(args.midi)
@@ -88,11 +103,13 @@ def main():
           f"pitch {min(n[2] for n in notes)}-{max(n[2] for n in notes)}")
 
     h2, pitches = h2_peaks(notes, order=args.order, alpha=args.alpha, min_z=args.min_z)
+    h2 = _nms(h2, value_idx=2, min_gap_s=args.min_gap)
     print(f"\nH2  melodic-surprise peaks (z>={args.min_z}, {len(pitches)} melody notes):")
     for t, iv, ic, z in h2:
         print(f"   t={t:6.2f}s  interval={iv:+3d} st  IC={ic:.2f} bits  z={z:.2f}")
 
-    h3 = h3_peaks(notes, win_s=args.win, hop_s=args.hop)
+    h3 = h3_peaks(notes, win_s=args.win, hop_s=args.hop, min_comp=args.h3_min)
+    h3 = _nms(h3, value_idx=2, min_gap_s=args.min_gap)
     print(f"\nH3  register/voice peaks:")
     for t, rt, c in h3:
         print(f"   t={t:6.2f}s  register_top={rt:.0f}  composite={c:.2f}")
